@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BD Log</title>
+<meta name="theme-color" content="#E8590C">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FAF8F4; --card:#FFFFFF; --ink:#1C2430; --sub:#7C8694; --line:#E6E2D9;
+  --orange:#E8590C; --green:#2F7D4F;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:'Barlow',system-ui,sans-serif;min-height:100vh;padding-bottom:84px}
+input,button,select{font-family:inherit;font-size:inherit}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+header{padding:18px 20px 10px;display:flex;align-items:baseline;justify-content:space-between}
+.logo{font-family:'Barlow Condensed';font-weight:700;font-size:26px;letter-spacing:.5px;text-transform:uppercase}
+.logo span{color:var(--orange)}
+.date{font-family:'IBM Plex Mono';font-size:11px;color:var(--sub)}
+.view{padding:4px 20px}
+.label{font-family:'Barlow Condensed';font-weight:600;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
+.input{width:100%;padding:13px 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font-size:15px;color:var(--ink)}
+.typerow{display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;border-radius:12px;cursor:pointer;border:2px solid var(--line);background:var(--card);color:var(--ink);font-weight:600;font-size:15px;text-align:left;transition:all .12s;margin-bottom:8px}
+.typerow .box{width:22px;height:22px;border-radius:6px;flex-shrink:0;border:2px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:1}
+.typerow .nm{flex:1}
+.typerow .ct{font-family:'IBM Plex Mono';font-size:12px;font-weight:600;opacity:.55}
+.typerow.on{color:#fff}
+.typerow.on .box{border-color:#fff;background:rgba(255,255,255,.2)}
+.typerow.on .ct{opacity:.9}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chips button{padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--sub);font-size:12px;cursor:pointer}
+.bigbtn{width:100%;margin-top:22px;padding:16px 0;border-radius:12px;border:none;cursor:pointer;background:var(--line);color:#fff;font-family:'Barlow Condensed';font-weight:700;font-size:22px;letter-spacing:2px;text-transform:uppercase}
+.bigbtn.ready{background:var(--orange);box-shadow:0 3px 10px rgba(232,89,12,.3)}
+.smallbtn{padding:10px 18px;border-radius:10px;border:none;background:var(--ink);color:#fff;font-weight:600;font-size:14px;cursor:pointer}
+.smallbtn.orange{background:var(--orange)}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;z-index:40;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:14px 0 18px;border:none;background:transparent;cursor:pointer;font-family:'Barlow Condensed';font-weight:700;font-size:16px;letter-spacing:1.5px;text-transform:uppercase;color:var(--sub);border-top:3px solid transparent;margin-top:-1px}
+nav button.on{color:var(--orange);border-top-color:var(--orange)}
+#toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.2);z-index:50;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;display:none}
+.bar{position:relative;height:10px;background:var(--paper);border-radius:999px;border:1px solid var(--line)}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;transition:width .3s}
+.bar .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);border-radius:1px}
+.mono{font-family:'IBM Plex Mono'}
+.entry{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.entry .del{border:none;background:transparent;color:var(--sub);font-size:18px;cursor:pointer;padding:6px}
+.tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;display:inline-block;margin:2px 4px 0 0}
+.hist{display:flex;align-items:flex-end;gap:8px;height:90px}
+.hist>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.muted{font-size:12px;color:var(--sub)}
+.srow{padding:12px 0;border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">BD <span>Log</span></div>
+  <div class="date" id="hdrdate"></div>
+</header>
+<div class="view" id="view"></div>
+<div id="toast"></div>
+<nav>
+  <button data-action="nav" data-view="log" id="nav-log">Log</button>
+  <button data-action="nav" data-view="review" id="nav-review">Review</button>
+  <button data-action="nav" data-view="settings" id="nav-settings">Settings</button>
+</nav>
+
+<script>
+// ---------- state ----------
+const KEY = "bdtracker:data";
+const CHIP = ["#E8590C","#1F6FB2","#2F7D4F","#8E44AD","#B7791F","#C0392B","#0E8074","#5B6B8C"];
+const DEFAULT_DATA = {
+  v:3,
+  settings:{ types:[
+    {id:"nnt",name:"New Name Touch",target:10,implies:null},
+    {id:"nnm",name:"New Name Meeting",target:3,implies:"nnt"},
+    {id:"sv",name:"Site Visit",target:2,implies:null},
+    {id:"bj",name:"Big Job",target:2,implies:null},
+    {id:"t10",name:"Top 10 Check-in",target:1,implies:null},
+  ]},
+  activities:[]
+};
+
+let data = load();
+let viewName = "log";
+let selected = new Set();
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(data)); }
+  catch(e){ toast("Couldn't save — storage error"); }
+}
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._tm); t._tm = setTimeout(()=>{ t.style.display="none"; }, 2000);
+}
+
+// ---------- date helpers (week Mon–Sun, pace Mon–Fri) ----------
+function weekStart(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setHours(0,0,0,0); x.setDate(x.getDate()-day); return x; }
+function workdaysElapsed(now){ const dow=(now.getDay()+6)%7; return Math.min(5, dow+1); }
+function fmtDay(ts){ return new Date(ts).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}); }
+function fmtTime(ts){ return new Date(ts).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }
+
+function weekCounts(types, acts){
+  const m={}; types.forEach(t=>m[t.id]=0);
+  acts.forEach(a=>(a.typeIds||[]).forEach(id=>{ if(id in m) m[id]+=1; }));
+  return m;
+}
+function weekActs(){
+  const ws = weekStart(new Date()).getTime();
+  return data.activities.filter(a=>a.ts>=ws).sort((a,b)=>b.ts-a.ts);
+}
+
+// ---------- render ----------
+function render(){
+  document.getElementById("hdrdate").textContent =
+    new Date().toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  ["log","review","settings"].forEach(v=>{
+    document.getElementById("nav-"+v).classList.toggle("on", v===viewName);
+  });
+  const el = document.getElementById("view");
+  if(viewName==="log") el.innerHTML = renderLog();
+  else if(viewName==="review") el.innerHTML = renderReview();
+  else el.innerHTML = renderSettings();
+}
+
+function typeListHTML(){
+  const counts = weekCounts(data.settings.types, weekActs());
+  return data.settings.types.map((t,i)=>{
+    const on = selected.has(t.id);
+    const c = CHIP[i%CHIP.length];
+    const style = on ? `border-color:${c};background:${c}` : "";
+    return `<button class="typerow ${on?"on":""}" style="${style}" data-action="toggle" data-id="${t.id}">
+      <span class="box">${on?"✓":""}</span>
+      <span class="nm">${esc(t.name)}</span>
+      <span class="ct">${counts[t.id]||0}/${t.target} wk</span>
+    </button>`;
+  }).join("") || `<div class="muted">No categories yet — add some in Settings.</div>`;
+}
+
+function renderLog(){
+  const recent = [];
+  for(const a of [...data.activities].sort((x,y)=>y.ts-x.ts)){
+    const c=(a.contact||"").trim();
+    if(c && !recent.includes(c)) recent.push(c);
+    if(recent.length>=6) break;
+  }
+  return `
+  <div class="label">Counts toward — tick all that apply</div>
+  <div id="typelist">${typeListHTML()}</div>
+  <div style="height:10px"></div>
+  <div class="label">Contact / company</div>
+  <input class="input" id="contact" placeholder="e.g. Tim Martin — John Cannon Homes">
+  ${recent.length?`<div class="chips">${recent.map(c=>`<button data-action="chip" data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>`:""}
+  <div style="height:16px"></div>
+  <div class="label">Note (optional)</div>
+  <input class="input" id="note" placeholder="Outcome, next step…">
+  <button class="bigbtn ${selected.size?"ready":""}" id="logbtn" data-action="save">${selected.size>1?`Log it (${selected.size} categories)`:"Log it"}</button>`;
+}
+
+function renderReview(){
+  const now = new Date();
+  const acts = weekActs();
+  const counts = weekCounts(data.settings.types, acts);
+  const elapsed = workdaysElapsed(now);
+  let onPace = 0;
+  const rows = data.settings.types.map((t,i)=>{
+    const count = counts[t.id]||0;
+    const expected = Math.round(t.target*elapsed/5);
+    const delta = count-expected;
+    if(delta>=0) onPace++;
+    const done = count>=t.target;
+    const pct = t.target>0?Math.min(100,count/t.target*100):0;
+    const pacePct = t.target>0?Math.min(100,expected/t.target*100):0;
+    const color = delta>=0?"var(--green)":"var(--orange)";
+    const badge = done?"✓ hit":(delta>0?`+${delta}`:(delta<0?`${delta}`:"on pace"));
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+        <div style="font-size:14px;font-weight:600">${esc(t.name)}</div>
+        <div class="mono" style="font-size:13px"><b>${count}</b><span style="color:var(--sub)">/${t.target}</span>
+        <span style="color:${color};margin-left:8px;font-size:11px">${badge}</span></div>
+      </div>
+      <div class="bar">
+        <div class="fill" style="width:${pct}%;background:${color}"></div>
+        ${done?"":`<div class="tick" style="left:${pacePct}%"></div>`}
+      </div>
+    </div>`;
+  }).join("");
+
+  let hist = "", histMax = 1;
+  const H = [];
+  for(let i=5;i>=0;i--){
+    const start = weekStart(new Date(now.getTime()-i*7*86400000)).getTime();
+    const end = start+7*86400000;
+    const n = data.activities.filter(a=>a.ts>=start&&a.ts<end).length;
+    H.push({label:new Date(start).toLocaleDateString(undefined,{month:"numeric",day:"numeric"}),n,cur:i===0});
+    histMax = Math.max(histMax,n);
+  }
+  hist = H.map(h=>`<div>
+    <div class="mono" style="font-size:11px;color:${h.cur?"var(--ink)":"var(--sub)"}">${h.n}</div>
+    <div style="width:100%;height:${Math.max(4,h.n/histMax*60)}px;background:${h.cur?"var(--orange)":"#D8D3C8"};border-radius:4px"></div>
+    <div class="mono" style="font-size:9px;color:var(--sub)">${h.label}</div>
+  </div>`).join("");
+
+  const entries = acts.length ? acts.map(a=>{
+    const tags = (a.typeNames||[]).map(n=>{
+      const idx = data.settings.types.findIndex(t=>t.name===n);
+      const c = CHIP[(idx>=0?idx:7)%CHIP.length];
+      return `<span class="tag" style="background:${c}22;color:${c};border:1px solid ${c}55">${esc(n)}</span>`;
+    }).join("");
+    return `<div class="entry">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600">${esc(a.contact)||"(no contact)"}</div>
+        <div>${tags}</div>
+        ${a.note?`<div class="muted" style="margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.note)}</div>`:""}
+        <div class="mono" style="font-size:10px;color:var(--sub);margin-top:2px">${fmtDay(a.ts)} · ${fmtTime(a.ts)}</div>
+      </div>
+      <button class="del" data-action="del" data-id="${a.id}" aria-label="Delete entry">×</button>
+    </div>`;
+  }).join("") : `<div class="muted" style="font-size:14px">Nothing logged yet this week. First tap wins.</div>`;
+
+  return `
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div class="label">Week status</div>
+      <div style="font-family:'Barlow Condensed';font-weight:700;font-size:34px;line-height:1">${onPace}<span style="font-size:18px;color:var(--sub)"> / ${data.settings.types.length} on pace</span></div>
+    </div>
+    <div class="mono" style="font-size:12px;color:var(--sub);text-align:right">${acts.length} interactions<br>this week</div>
+  </div>
+  <div class="card">
+    <div class="label">Targets</div>
+    ${rows}
+    <div class="mono" style="font-size:10px;color:var(--sub)">black tick = where you should be by today (Mon–Fri pace) · one interaction can count in several rows</div>
+  </div>
+  <div class="card">
+    <div class="label">Last 6 weeks — interactions</div>
+    <div class="hist">${hist}</div>
+  </div>
+  <div class="card">
+    <div class="label">This week's entries</div>
+    ${entries}
+  </div>`;
+}
+
+function renderSettings(){
+  const types = data.settings.types;
+  const rows = types.map((t,i)=>{
+    const opts = types.filter(o=>o.id!==t.id&&o.implies!==t.id)
+      .map(o=>`<option value="${o.id}" ${t.implies===o.id?"selected":""}>${esc(o.name)}</option>`).join("");
+    return `<div class="srow">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:10px;height:10px;border-radius:999px;background:${CHIP[i%CHIP.length]};flex-shrink:0"></div>
+        <input class="input" style="flex:1;padding:9px 12px" value="${esc(t.name)}" data-change="name" data-id="${t.id}">
+        <input class="input mono" style="width:58px;padding:9px 0;text-align:center" inputmode="numeric" value="${t.target}" data-change="target" data-id="${t.id}" aria-label="Weekly target for ${esc(t.name)}">
+        <button class="del" data-action="deltype" data-id="${t.id}" style="border:none;background:transparent;color:var(--sub);font-size:20px;cursor:pointer;padding:4px" aria-label="Remove ${esc(t.name)}">×</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-left:18px">
+        <span class="muted" style="white-space:nowrap">always also ticks</span>
+        <select data-change="implies" data-id="${t.id}" style="flex:1;padding:7px 10px;border-radius:8px;border:1.5px solid var(--line);background:var(--card);font-size:13px;color:var(--ink)">
+          <option value="">— nothing —</option>${opts}
+        </select>
+      </div>
+    </div>`;
+  }).join("");
+  return `
+  <div class="card">
+    <div class="label">Categories & weekly targets</div>
+    ${rows}
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <input class="input" style="flex:1;padding:10px 12px" id="newtype" placeholder="New category">
+      <button class="smallbtn orange" data-action="addtype">Add</button>
+    </div>
+    <div class="muted" style="margin-top:10px">The number is the weekly target. "Always also ticks" pre-selects another category when this one is tapped — you can still tick or untick anything per entry. Removing a category keeps its past entries.</div>
+  </div>
+  <div class="card">
+    <div class="label">Data</div>
+    <button class="smallbtn" style="width:100%;padding:12px 18px" data-action="csv">Export all entries to CSV</button>
+    <div class="muted" style="margin-top:8px">${data.activities.length} interactions total. Each row lists every category it counted toward — pivots cleanly in Excel.</div>
+  </div>`;
+}
+
+// ---------- actions ----------
+document.addEventListener("click", e=>{
+  const el = e.target.closest("[data-action]");
+  if(!el) return;
+  const act = el.dataset.action;
+
+  if(act==="nav"){ viewName = el.dataset.view; render(); }
+
+  else if(act==="toggle"){
+    const id = el.dataset.id;
+    if(selected.has(id)) selected.delete(id);
+    else{
+      selected.add(id);
+      const t = data.settings.types.find(x=>x.id===id);
+      if(t && t.implies) selected.add(t.implies);
+    }
+    // re-render only the checkbox list + button so inputs keep their text
+    document.getElementById("typelist").innerHTML = typeListHTML();
+    const btn = document.getElementById("logbtn");
+    btn.classList.toggle("ready", selected.size>0);
+    btn.textContent = selected.size>1?`Log it (${selected.size} categories)`:"Log it";
+  }
+
+  else if(act==="chip"){ document.getElementById("contact").value = el.dataset.c; }
+
+  else if(act==="save"){
+    if(selected.size===0) return;
+    const chosen = data.settings.types.filter(t=>selected.has(t.id));
+    const entry = {
+      id:"a"+Date.now()+Math.random().toString(36).slice(2,6),
+      typeIds:chosen.map(t=>t.id),
+      typeNames:chosen.map(t=>t.name),
+      contact:(document.getElementById("contact").value||"").trim(),
+      note:(document.getElementById("note").value||"").trim(),
+      ts:Date.now()
+    };
+    data.activities.push(entry);
+    save();
+    selected = new Set();
+    render();
+    toast("Logged: "+entry.typeNames.join(" + "));
+  }
+
+  else if(act==="del"){
+    data.activities = data.activities.filter(a=>a.id!==el.dataset.id);
+    save(); render();
+  }
+
+  else if(act==="addtype"){
+    const inp = document.getElementById("newtype");
+    const name = (inp.value||"").trim();
+    if(!name) return;
+    data.settings.types.push({id:"t"+Date.now(),name,target:2,implies:null});
+    save(); render(); toast(`Added "${name}"`);
+  }
+
+  else if(act==="deltype"){
+    const id = el.dataset.id;
+    data.settings.types = data.settings.types.filter(t=>t.id!==id)
+      .map(t=>t.implies===id?{...t,implies:null}:t);
+    save(); render();
+  }
+
+  else if(act==="csv"){
+    const escq = s=>`"${String(s??"").replace(/"/g,'""')}"`;
+    const rows = [["date","time","categories","contact","note"].join(",")]
+      .concat([...data.activities].sort((a,b)=>a.ts-b.ts).map(a=>{
+        const d=new Date(a.ts);
+        return [escq(d.toLocaleDateString()),escq(d.toLocaleTimeString()),escq((a.typeNames||[]).join("; ")),escq(a.contact),escq(a.note)].join(",");
+      }));
+    const blob = new Blob([rows.join("\n")],{type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const aEl = document.createElement("a");
+    aEl.href=url; aEl.download=`bd-log-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(aEl); aEl.click(); document.body.removeChild(aEl);
+    URL.revokeObjectURL(url);
+    toast("CSV exported");
+  }
+});
+
+document.addEventListener("change", e=>{
+  const el = e.target.closest("[data-change]");
+  if(!el) return;
+  const t = data.settings.types.find(x=>x.id===el.dataset.id);
+  if(!t) return;
+  const kind = el.dataset.change;
+  if(kind==="name"){ const v=el.value.trim(); if(v) t.name=v; else el.value=t.name; }
+  else if(kind==="target"){ t.target = Math.max(0, parseInt(el.value,10)||0); el.value=t.target; }
+  else if(kind==="implies"){ t.implies = el.value||null; }
+  save();
+});
+
+render();
+
+// ---------- service worker ----------
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("./sw.js").catch(()=>{}); });
+}
+</script>
+</body>
+</html>
