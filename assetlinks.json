@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.happyh44.twa",
+        "sha256_cert_fingerprints": ["79:AC:0E:6C:FB:4D:27:CC:FE:BF:CE:F2:B5:45:A1:B7:8C:32:BE:D3:DE:9C:20:3E:C6:85:4F:F9:C7:B9:89:01"]
+      }
+    }]
