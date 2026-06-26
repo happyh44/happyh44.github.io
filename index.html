@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>BD Log TEST</title>
+<title>BD Log</title>
 <meta name="theme-color" content="#E8590C">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
@@ -55,12 +55,17 @@ nav button.on{color:var(--orange);border-top-color:var(--orange)}
 .hist>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
 .muted{font-size:12px;color:var(--sub)}
 .srow{padding:12px 0;border-bottom:1px solid var(--line)}
+.wkbtn{width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font-size:24px;line-height:1;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.wkbtn:disabled{opacity:.3;cursor:default}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">BD <span>Log</span></div>
-  <div class="date" id="hdrdate"></div>
+  <div style="text-align:right">
+    <div class="date" id="hdrdate"></div>
+    <div class="date" style="opacity:.55">v4 · weeks</div>
+  </div>
 </header>
 <div class="view" id="view"></div>
 <div id="toast"></div>
@@ -89,6 +94,7 @@ const DEFAULT_DATA = {
 let data = load();
 let viewName = "log";
 let selected = new Set();
+let weekOffset = 0; // 0 = this week, 1 = last week, etc.
 
 function load(){
   try{
@@ -122,6 +128,30 @@ function weekCounts(types, acts){
 function weekActs(){
   const ws = weekStart(new Date()).getTime();
   return data.activities.filter(a=>a.ts>=ws).sort((a,b)=>b.ts-a.ts);
+}
+// ---------- past-week helpers ----------
+function weekStartFor(offset){
+  const ws = weekStart(new Date());
+  ws.setDate(ws.getDate()-offset*7);
+  return ws;
+}
+function actsForWeek(offset){
+  const start = weekStartFor(offset).getTime();
+  const end = start+7*86400000;
+  return data.activities.filter(a=>a.ts>=start&&a.ts<end).sort((a,b)=>b.ts-a.ts);
+}
+function weekLabel(offset){
+  const s = weekStartFor(offset);
+  const e = new Date(s.getTime()+6*86400000);
+  const f = d=>d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  return `${f(s)} – ${f(e)}`;
+}
+function maxWeekOffset(){
+  if(!data.activities.length) return 0;
+  const oldest = Math.min(...data.activities.map(a=>a.ts));
+  const oldestWeek = weekStart(new Date(oldest)).getTime();
+  const thisWeek = weekStart(new Date()).getTime();
+  return Math.round((thisWeek-oldestWeek)/(7*86400000));
 }
 
 // ---------- render ----------
@@ -173,20 +203,26 @@ function renderLog(){
 
 function renderReview(){
   const now = new Date();
-  const acts = weekActs();
+  const isCurrent = weekOffset===0;
+  const acts = actsForWeek(weekOffset);
   const counts = weekCounts(data.settings.types, acts);
   const elapsed = workdaysElapsed(now);
-  let onPace = 0;
+  let onPace = 0, hit = 0;
   const rows = data.settings.types.map((t,i)=>{
     const count = counts[t.id]||0;
+    const done = count>=t.target;
+    if(done) hit++;
     const expected = Math.round(t.target*elapsed/5);
     const delta = count-expected;
     if(delta>=0) onPace++;
-    const done = count>=t.target;
     const pct = t.target>0?Math.min(100,count/t.target*100):0;
     const pacePct = t.target>0?Math.min(100,expected/t.target*100):0;
-    const color = delta>=0?"var(--green)":"var(--orange)";
-    const badge = done?"✓ hit":(delta>0?`+${delta}`:(delta<0?`${delta}`:"on pace"));
+    // current week: green/orange vs today's pace · past week: green if hit, grey if missed
+    const color = isCurrent ? (delta>=0?"var(--green)":"var(--orange)") : (done?"var(--green)":"var(--sub)");
+    const badge = isCurrent
+      ? (done?"✓ hit":(delta>0?`+${delta}`:(delta<0?`${delta}`:"on pace")))
+      : (done?"✓ hit":`${count-t.target}`);
+    const showTick = isCurrent && !done;
     return `<div style="margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
         <div style="font-size:14px;font-weight:600">${esc(t.name)}</div>
@@ -195,24 +231,34 @@ function renderReview(){
       </div>
       <div class="bar">
         <div class="fill" style="width:${pct}%;background:${color}"></div>
-        ${done?"":`<div class="tick" style="left:${pacePct}%"></div>`}
+        ${showTick?`<div class="tick" style="left:${pacePct}%"></div>`:""}
       </div>
     </div>`;
   }).join("");
 
+  const maxOff = maxWeekOffset();
+  const nav = `<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <button class="wkbtn" data-action="weekback" ${weekOffset>=maxOff?"disabled":""} aria-label="Older week">‹</button>
+    <div style="text-align:center">
+      <div class="label" style="margin-bottom:2px">${isCurrent?"This week":(weekOffset===1?"Last week":weekOffset+" weeks ago")}</div>
+      <div class="mono" style="font-size:13px;color:var(--ink)">${weekLabel(weekOffset)}</div>
+    </div>
+    <button class="wkbtn" data-action="weekfwd" ${weekOffset<=0?"disabled":""} aria-label="Newer week">›</button>
+  </div>`;
+
   let hist = "", histMax = 1;
   const H = [];
   for(let i=5;i>=0;i--){
-    const start = weekStart(new Date(now.getTime()-i*7*86400000)).getTime();
+    const start = weekStartFor(i).getTime();
     const end = start+7*86400000;
     const n = data.activities.filter(a=>a.ts>=start&&a.ts<end).length;
-    H.push({label:new Date(start).toLocaleDateString(undefined,{month:"numeric",day:"numeric"}),n,cur:i===0});
+    H.push({label:new Date(start).toLocaleDateString(undefined,{month:"numeric",day:"numeric"}),n,off:i,sel:i===weekOffset});
     histMax = Math.max(histMax,n);
   }
-  hist = H.map(h=>`<div>
-    <div class="mono" style="font-size:11px;color:${h.cur?"var(--ink)":"var(--sub)"}">${h.n}</div>
-    <div style="width:100%;height:${Math.max(4,h.n/histMax*60)}px;background:${h.cur?"var(--orange)":"#D8D3C8"};border-radius:4px"></div>
-    <div class="mono" style="font-size:9px;color:var(--sub)">${h.label}</div>
+  hist = H.map(h=>`<div data-action="weekjump" data-offset="${h.off}" style="cursor:pointer">
+    <div class="mono" style="font-size:11px;color:${h.sel?"var(--ink)":"var(--sub)"}">${h.n}</div>
+    <div style="width:100%;height:${Math.max(4,h.n/histMax*60)}px;background:${h.sel?"var(--orange)":"#D8D3C8"};border-radius:4px"></div>
+    <div class="mono" style="font-size:9px;color:${h.sel?"var(--ink)":"var(--sub)"}">${h.label}</div>
   </div>`).join("");
 
   const entries = acts.length ? acts.map(a=>{
@@ -230,27 +276,28 @@ function renderReview(){
       </div>
       <button class="del" data-action="del" data-id="${a.id}" aria-label="Delete entry">×</button>
     </div>`;
-  }).join("") : `<div class="muted" style="font-size:14px">Nothing logged yet this week. First tap wins.</div>`;
+  }).join("") : `<div class="muted" style="font-size:14px">${isCurrent?"Nothing logged yet this week. First tap wins.":"No interactions logged that week."}</div>`;
 
   return `
+  ${nav}
   <div class="card" style="display:flex;justify-content:space-between;align-items:center">
     <div>
-      <div class="label">Week status</div>
-      <div style="font-family:'Barlow Condensed';font-weight:700;font-size:34px;line-height:1">${onPace}<span style="font-size:18px;color:var(--sub)"> / ${data.settings.types.length} on pace</span></div>
+      <div class="label">${isCurrent?"On pace":"Targets hit"}</div>
+      <div style="font-family:'Barlow Condensed';font-weight:700;font-size:34px;line-height:1">${isCurrent?onPace:hit}<span style="font-size:18px;color:var(--sub)"> / ${data.settings.types.length} ${isCurrent?"on pace":"hit"}</span></div>
     </div>
-    <div class="mono" style="font-size:12px;color:var(--sub);text-align:right">${acts.length} interactions<br>this week</div>
+    <div class="mono" style="font-size:12px;color:var(--sub);text-align:right">${acts.length} interaction${acts.length===1?"":"s"}<br>${isCurrent?"this week":"that week"}</div>
   </div>
   <div class="card">
-    <div class="label">Targets</div>
+    <div class="label">By category${isCurrent?"":" — "+weekLabel(weekOffset)}</div>
     ${rows}
-    <div class="mono" style="font-size:10px;color:var(--sub)">black tick = where you should be by today (Mon–Fri pace) · one interaction can count in several rows</div>
+    <div class="mono" style="font-size:10px;color:var(--sub)">${isCurrent?"black tick = where you should be by today (Mon–Fri pace) · ":""}one interaction can count in several rows</div>
   </div>
   <div class="card">
-    <div class="label">Last 6 weeks — interactions</div>
+    <div class="label">Last 6 weeks — tap to jump</div>
     <div class="hist">${hist}</div>
   </div>
   <div class="card">
-    <div class="label">This week's entries</div>
+    <div class="label">${isCurrent?"This week's entries":"Entries — "+weekLabel(weekOffset)}</div>
     ${entries}
   </div>`;
 }
@@ -298,7 +345,11 @@ document.addEventListener("click", e=>{
   if(!el) return;
   const act = el.dataset.action;
 
-  if(act==="nav"){ viewName = el.dataset.view; render(); }
+  if(act==="nav"){ if(el.dataset.view==="review") weekOffset=0; viewName = el.dataset.view; render(); }
+
+  else if(act==="weekback"){ weekOffset = Math.min(maxWeekOffset(), weekOffset+1); render(); }
+  else if(act==="weekfwd"){ weekOffset = Math.max(0, weekOffset-1); render(); }
+  else if(act==="weekjump"){ weekOffset = parseInt(el.dataset.offset,10)||0; render(); }
 
   else if(act==="toggle"){
     const id = el.dataset.id;
